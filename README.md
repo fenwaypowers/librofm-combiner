@@ -39,4 +39,4 @@ If any of these dependencies are missing, the script will not work correctly.
 13. Convert to MP3: Converts the concatenated audio file to MP3 format, adding metadata and cover image if available.
 14. Clean up: Removes the intermediate `.mka` file.
 
-Note: The script assumes that the MP3 files in the directory follow the naming convention `"<book_title> - Track001.mp3"`, `"Track002.mp3"`, and so on.
+Note: The script assumes that the MP3 files in the directory follow the naming convention `"<book_title> - Track 001.mp3"`, `"Track 002.mp3"`, and so on.
