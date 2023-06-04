@@ -1,4 +1,4 @@
-import subprocess, argparse, os
+import subprocess, argparse, os, json
 
 def main():
     global output_path
@@ -25,6 +25,7 @@ def main():
     
     # Run the command
     subprocess.run(cmd, shell=True)
+    extract_cover_image()
     convert_to_mp3()
 
 def add_tracks(cmd: str):
@@ -53,6 +54,20 @@ def finishcmd(cmd: str, append_sections: str):
     # Finish up the command
     cmd += " --chapter-language und --generate-chapters-name-template 'Chapter <NUM:2>' --generate-chapters when-appending --append-to {}".format(append_sections)
     return cmd
+
+def extract_cover_image():
+    first_track_path = f"{base_path} 001.mp3"
+    metadata = subprocess.run(['ffprobe', '-show_streams', '-print_format', 'json', first_track_path], capture_output=True, text=True)
+    metadata_json = json.loads(metadata.stdout)
+
+    for stream in metadata_json["streams"]:
+        if stream["codec_type"] == "video":
+            print("Image metadata found, extracting image...")
+            subprocess.run(['ffmpeg', '-i', first_track_path, '-an', '-codec:v', 'copy', 'cover.jpg'])
+            print("Image extracted as cover.jpg")
+            return
+
+    print("No image metadata found.")
 
 def convert_to_mp3():
     mp3_output = os.path.join(os.path.dirname(output_path), f"{book_title}.mp3")
