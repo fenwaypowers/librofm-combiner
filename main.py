@@ -1,9 +1,12 @@
-import subprocess, argparse, os, json
+import subprocess, argparse, os, json, glob
+
+num_tracks = 0
 
 def main():
     global output_path
     global base_path
     global book_title
+    global num_tracks
 
     parser = argparse.ArgumentParser(description='Takes MP3 files downloaded from Libro.fm and concatenates them into one MP3 file with generated chapters.')
     parser.add_argument('-d','--dir', help='Specify the directory where the MP3 files you wish to concatenate. The directory name should be the same as the title of the audiobook as in the MP3 files.', default='.')
@@ -16,6 +19,9 @@ def main():
 
     output_path = os.path.join(cwd, f"{book_title}.mka")
     base_path = os.path.join(cwd, f"{book_title} - Track")
+
+    # Get the number of .mp3 files in the directory
+    num_tracks = len(glob.glob(f"{base_path} *.mp3"))
 
     cmd = "mkvmerge --ui-language en_US --priority lower --output '{}' --language 0:und".format(output_path)
 
@@ -30,7 +36,7 @@ def main():
 
 def add_tracks(cmd: str):
     # Add all tracks to cmd
-    for i in range(1, 25):
+    for i in range(1, num_tracks+1):
         track_number = f"{i:03}"
         track_path = f"{base_path} {track_number}.mp3"
         cmd += " '(' '{}' ')' +".format(track_path)
@@ -42,7 +48,7 @@ def add_tracks(cmd: str):
 def append():
     append_sections = ""
     # Append --append-to sections
-    for i in range(1, 24):
+    for i in range(1, num_tracks):
         append_section = f"{i}:0:{i-1}:0"
         append_sections += f",{append_section}"
 
@@ -63,22 +69,37 @@ def extract_cover_image():
     for stream in metadata_json["streams"]:
         if stream["codec_type"] == "video":
             print("Image metadata found, extracting image...")
-            subprocess.run(['ffmpeg', '-i', first_track_path, '-an', '-codec:v', 'copy', 'cover.jpg'])
+            subprocess.run(['ffmpeg', '-y', '-i', first_track_path, '-an', '-codec:v', 'copy', 'cover.jpg'])
             print("Image extracted as cover.jpg")
             return
 
     print("No image metadata found.")
 
+def prompt_artist_name():
+    return input("Please enter the album artist name: ")
+
+def remove_mka_file():
+    if os.path.exists(output_path):
+        os.remove(output_path)
+        print(f"Removed {output_path}")
+    else:
+        print(f"{output_path} not found")
+
 def convert_to_mp3():
     mp3_output = os.path.join(os.path.dirname(output_path), f"{book_title}.mp3")
     cover_path = os.path.join(os.path.dirname(output_path), "cover.jpg")
 
+    artist_name = prompt_artist_name()
+
     if os.path.exists(cover_path):
-        cmd = f"ffmpeg -i '{output_path}' -i '{cover_path}' -map 0 -map 1 -c copy -id3v2_version 3 -metadata:s:v title='Album cover' -metadata:s:v comment='Cover (front)' '{mp3_output}'"
+        cmd = f"ffmpeg -y -i '{output_path}' -i '{cover_path}' -map 0 -map 1 -c copy -id3v2_version 3 -metadata:s:v title='Album cover' -metadata:s:v comment='Cover (front)' -metadata title='{book_title}' -metadata album='{book_title}' -metadata album_artist='{artist_name}' -metadata artist='{artist_name}' '{mp3_output}'"
     else:
-        cmd = f"ffmpeg -i '{output_path}' -c:a copy -c:s copy '{mp3_output}'"
+        cmd = f"ffmpeg -y -i '{output_path}' -c:a copy -c:s copy -metadata title='{book_title}' -metadata album='{book_title}' -metadata album_artist='{artist_name}' -metadata artist='{artist_name}' '{mp3_output}'"
     
     subprocess.run(cmd, shell=True)
+    
+    # Remove the .mka file after .mp3 is created
+    remove_mka_file()
 
 if __name__ == "__main__":
     main()
