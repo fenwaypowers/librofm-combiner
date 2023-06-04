@@ -1,6 +1,13 @@
-import subprocess, argparse, os, json, glob
+import subprocess, argparse, os, json, shutil
 
 num_tracks = 0
+
+def check_dependencies():
+    for dependency in ['ffmpeg', 'ffprobe', 'mkvmerge']:
+        if shutil.which(dependency) is None:
+            print(f"Error: {dependency} is not installed.")
+            return False
+    return True
 
 def main():
     global output_path
@@ -8,10 +15,16 @@ def main():
     global book_title
     global num_tracks
 
+    if not check_dependencies():
+        return
+
     parser = argparse.ArgumentParser(description='Takes MP3 files downloaded from Libro.fm and concatenates them into one MP3 file with generated chapters.')
     parser.add_argument('-d','--dir', help='Specify the directory where the MP3 files you wish to concatenate. The directory name should be the same as the title of the audiobook as in the MP3 files.', default='.')
 
     args = parser.parse_args()
+    if not os.path.isdir(args.dir):
+        print("Error: the provided directory does not exist.")
+        return
     os.chdir(args.dir)
 
     cwd = os.getcwd()
@@ -21,7 +34,10 @@ def main():
     base_path = os.path.join(cwd, f"{book_title} - Track")
 
     # Get the number of .mp3 files in the directory
-    num_tracks = len(glob.glob(f"{base_path} *.mp3"))
+    num_tracks = get_track_count(book_title)
+    if num_tracks == 0:
+        print("Error: no tracks found.")
+        return
 
     cmd = "mkvmerge --ui-language en_US --priority lower --output '{}' --language 0:und".format(output_path)
 
@@ -30,16 +46,29 @@ def main():
     cmd = finishcmd(cmd, append_sections)
     
     # Run the command
-    subprocess.run(cmd, shell=True)
+    result = subprocess.run(cmd, shell=True)
+    if result.returncode != 0:
+        print("Error: the command failed.")
+        return
     extract_cover_image()
     convert_to_mp3()
+
+def get_track_count(book_title: str):
+    counter = 0
+
+    for filename in os.listdir():
+        if filename.startswith(f"{book_title} - Track") and filename.endswith(".mp3"):
+            counter += 1
+
+    return counter
 
 def add_tracks(cmd: str):
     # Add all tracks to cmd
     for i in range(1, num_tracks+1):
         track_number = f"{i:03}"
         track_path = f"{base_path} {track_number}.mp3"
-        cmd += " '(' '{}' ')' +".format(track_path)
+        if os.path.exists(track_path):
+            cmd += " '(' '{}' ')' +".format(track_path)
 
     # Remove trailing '+' from the command
     cmd = cmd[:-2]
@@ -63,6 +92,10 @@ def finishcmd(cmd: str, append_sections: str):
 
 def extract_cover_image():
     first_track_path = f"{base_path} 001.mp3"
+    if not os.path.exists(first_track_path):
+        print("Error: the first track MP3 file does not exist.")
+        return
+
     metadata = subprocess.run(['ffprobe', '-show_streams', '-print_format', 'json', first_track_path], capture_output=True, text=True)
     metadata_json = json.loads(metadata.stdout)
 
