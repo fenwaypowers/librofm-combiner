@@ -71,7 +71,13 @@ def extract_cover_image():
 
 def convert_to_mp3():
     mp3_output = os.path.join(os.path.dirname(output_path), f"{book_title}.mp3")
-    cmd = f"ffmpeg -i '{output_path}' -c:a copy -c:s copy '{mp3_output}'"
+    cover_path = os.path.join(os.path.dirname(output_path), "cover.jpg")
+
+    if os.path.exists(cover_path):
+        cmd = f"ffmpeg -i '{output_path}' -i '{cover_path}' -map 0 -map 1 -c copy -id3v2_version 3 -metadata:s:v title='Album cover' -metadata:s:v comment='Cover (front)' '{mp3_output}'"
+    else:
+        cmd = f"ffmpeg -i '{output_path}' -c:a copy -c:s copy '{mp3_output}'"
+    
     subprocess.run(cmd, shell=True)
 
 if __name__ == "__main__":
