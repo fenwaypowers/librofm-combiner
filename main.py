@@ -25,6 +25,7 @@ def main():
     
     # Run the command
     subprocess.run(cmd, shell=True)
+    convert_to_mp3()
 
 def add_tracks(cmd: str):
     # Add all tracks to cmd
@@ -52,6 +53,11 @@ def finishcmd(cmd: str, append_sections: str):
     # Finish up the command
     cmd += " --chapter-language und --generate-chapters-name-template 'Chapter <NUM:2>' --generate-chapters when-appending --append-to {}".format(append_sections)
     return cmd
+
+def convert_to_mp3():
+    mp3_output = os.path.join(os.path.dirname(output_path), f"{book_title}.mp3")
+    cmd = f"ffmpeg -i '{output_path}' -c:a copy -c:s copy '{mp3_output}'"
+    subprocess.run(cmd, shell=True)
 
 if __name__ == "__main__":
     main()
